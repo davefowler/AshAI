@@ -428,53 +428,27 @@ Patient History: Chat-based consultation"""
             evaluation_score = ashai_response.evaluation.get('overall_score', 75) if ashai_response.evaluation else 75
             base_confidence = evaluation_score / 100.0  # Convert to 0-1 scale
             
-            # Check if this is an error response
-            if "I apologize, but I encountered an issue" in ashai_response.response:
-                # Don't split error messages, just return as one response
-                suggested_responses.append({
-                    "type": "TEXT",
-                    "title": "Medical Response",
-                    "body": ashai_response.response,
-                    "confidence": base_confidence * 0.8  # Lower confidence for error responses
-                })
-            else:
-                # Split response into logical parts
-                # Look for natural break points like periods followed by spaces
-                response_parts = []
-                current_part = ""
-                
-                sentences = ashai_response.response.split('. ')
-                for sentence in sentences:
-                    if sentence.strip():
-                        # If adding this sentence would make the part too long, start a new part
-                        if len(current_part + sentence) > 200 and current_part:
-                            response_parts.append(current_part.strip())
-                            current_part = sentence
-                        else:
-                            if current_part:
-                                current_part += ". " + sentence
-                            else:
-                                current_part = sentence
-                
-                # Add the last part
-                if current_part.strip():
-                    response_parts.append(current_part.strip())
-                
-                # Create suggested responses from parts
-                for i, part in enumerate(response_parts[:3]):  # Max 3 suggestions
-                    if part.strip():
-                        title = f"Response Part {i+1}" if len(response_parts) > 1 else "Medical Response"
-                        
-                        # Calculate confidence based on evaluation score and position
-                        # First part gets full confidence, subsequent parts get slightly reduced
-                        part_confidence = base_confidence * (1.0 - (i * 0.05))  # 5% reduction per part
-                        
-                        suggested_responses.append({
-                            "type": "TEXT",
-                            "title": title,
-                            "body": part.strip() + ("." if not part.strip().endswith(".") else ""),
-                            "confidence": round(part_confidence, 2)
-                        })
+            # Add the complete AshAI response as the main suggested response
+            suggested_responses.append({
+                "type": "TEXT",
+                "title": "Complete Medical Response",
+                "body": ashai_response.response,
+                "confidence": round(base_confidence, 2)
+            })
+        
+        # Add individual FAQs as additional suggested responses
+        if ashai_response.faqs:
+            for i, faq in enumerate(ashai_response.faqs[:3]):  # Max 3 FAQ suggestions
+                if faq.answer and len(faq.answer.strip()) > 20:  # Only add substantial FAQs
+                    # FAQ confidence is slightly lower than main response but still high
+                    faq_confidence = round(base_confidence * 0.9, 2)
+                    
+                    suggested_responses.append({
+                        "type": "TEXT",
+                        "title": f"FAQ: {faq.question[:50]}{'...' if len(faq.question) > 50 else ''}",
+                        "body": faq.answer,
+                        "confidence": faq_confidence
+                    })
         
         # Add disclaimer as a separate suggestion with moderate confidence
         suggested_responses.append({
