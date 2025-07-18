@@ -21,13 +21,14 @@ class PubMedAPI:
         self.tool = tool
         self.session = requests.Session()
     
-    def search_and_fetch(self, query: str, max_results: int = 3) -> List[WebFAQResult]:
+    def search_and_fetch(self, query: str, max_results: int = 3, snippet_length: int = 500) -> List[WebFAQResult]:
         """
         Search PubMed and fetch article details
         
         Args:
             query: Search query string
             max_results: Maximum number of results to return
+            snippet_length: Length of content snippets in characters
             
         Returns:
             List of WebFAQResult objects
@@ -41,7 +42,7 @@ class PubMedAPI:
         # Then fetch article details
         articles = self._fetch_articles(pmids)
         
-        return self._format_results(articles)
+        return self._format_results(articles, snippet_length)
     
     def _search_articles(self, query: str, max_results: int) -> List[str]:
         """Search for article PMIDs using esearch"""
@@ -167,14 +168,14 @@ class PubMedAPI:
         else:
             return "General population"
     
-    def _format_results(self, articles: List[Dict]) -> List[WebFAQResult]:
+    def _format_results(self, articles: List[Dict], snippet_length: int = 500) -> List[WebFAQResult]:
         """Format articles as WebFAQResult objects"""
         results = []
         
         for article in articles:
-            # Create snippet from abstract (first 300 characters)
+            # Create snippet from abstract with configurable length
             abstract = article.get("abstract", "")
-            snippet = abstract[:300] + "..." if len(abstract) > 300 else abstract
+            snippet = abstract[:snippet_length] + "..." if len(abstract) > snippet_length else abstract
             
             # Create PubMed URL
             pmid = article.get("pmid", "")
@@ -201,17 +202,18 @@ class PubMedAPI:
 
 
 # Convenience function for direct usage
-def search_and_fetch(query: str, max_results: int = 3, email: Optional[str] = None) -> List[WebFAQResult]:
+def search_and_fetch(query: str, max_results: int = 3, snippet_length: int = 500, email: Optional[str] = None) -> List[WebFAQResult]:
     """
     Convenience function to search PubMed and fetch results
     
     Args:
         query: Search query string
         max_results: Maximum number of results to return
+        snippet_length: Length of content snippets in characters
         email: Your email address (recommended by NCBI)
         
     Returns:
         List of WebFAQResult objects
     """
     api = PubMedAPI(email=email)
-    return api.search_and_fetch(query, max_results) 
+    return api.search_and_fetch(query, max_results, snippet_length) 

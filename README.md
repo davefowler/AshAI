@@ -156,7 +156,7 @@ Synthesizes multiple PubMed sources into structured Q&A pairs.
 ```bash
 curl -X POST http://localhost:8000/faq \
   -H "Content-Type: application/json" \
-  -d '{"query": "pregnancy nutrition guidelines", "max_results": 3}'
+  -d '{"query": "pregnancy nutrition guidelines", "max_results": 3, "snippet_length": 500}'
 ```
 
 **Response:**
@@ -182,7 +182,53 @@ curl -X POST http://localhost:8000/faq \
 }
 ```
 
-### 4. `/sources` - Raw PubMed Sources
+### 4. `/faq/niharika` - Niharika FAQ (Bengali/English)
+
+Searches curated Google Sheet containing Bengali/English medical Q&A pairs specifically for pregnancy and maternal health.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/faq/niharika \
+  -H "Content-Type: application/json" \
+  -d '{"query": "neck pain headache pregnancy", "max_results": 2}'
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "question": "4 months pregnant mother. 2nd pregnancy. Back of head hurts. The jugular vein remains. It also hurts the stomach. what to do",
+      "answer": "Thanks for your question. Headaches and varicose veins during pregnancy can be symptoms of high blood pressure, which are pregnancy risk factors. So, visit your nearest doctor or hospital without delay and seek necessary treatment. Abdominal pain can be reduced by following the following: 1. Eat a balanced diet rich in vitamins and minerals including vegetables and seasonal fruits 2. Eat small meals 4-6 times a day each time 3. Drink enough water 4. Get enough rest and sleep 5. Do not drink tea or coffee. If the stomach pain is severe, go to the doctor or hospital. The doctor will give proper treatment and advice considering your physical condition. *** Follow the advice of our phone-based health education service.***",
+      "sources": [
+        {
+          "title": "Niharika FAQ: Neck Pain + Hypertension",
+          "pmid": "niharika-faq",
+          "url": "https://docs.google.com/spreadsheets/d/1jE9m65m_fCQRZcfFfTVMxifmJKaE6J4WPKY9CrRtOkg/edit?usp=sharing"
+        }
+      ],
+      "population": "Pregnant women"
+    }
+  ],
+  "query": "neck pain headache pregnancy",
+  "total_results": 1
+}
+```
+
+**Features:**
+- **English Output**: Returns English translations of medical advice from Bengali healthcare experts
+- **Pregnancy-Focused**: Specialized content for maternal health from Bengali medical context
+- **Real-time Data**: Reads directly from live Google Sheet
+- **Cultural Sensitivity**: Culturally appropriate medical advice translated to English
+- **Multilingual Search**: Searches across keywords, Bengali questions, and English questions
+
+**Example Queries:**
+- `"neck pain headache pregnancy"` - Pregnancy-related pain management
+- `"blurred vision swollen legs"` - Pre-eclampsia symptoms
+- `"eclampsia seizures"` - Serious pregnancy complications
+- `"edema leg swelling"` - Pregnancy swelling concerns
+
+### 5. `/sources` - Raw PubMed Sources
 
 Returns raw snippets from individual PubMed articles.
 
@@ -190,7 +236,7 @@ Returns raw snippets from individual PubMed articles.
 ```bash
 curl -X POST http://localhost:8000/sources \
   -H "Content-Type: application/json" \
-  -d '{"query": "postpartum depression symptoms"}'
+  -d '{"query": "postpartum depression symptoms", "max_results": 2, "snippet_length": 800}'
 ```
 
 **Response:**
@@ -210,7 +256,7 @@ curl -X POST http://localhost:8000/sources \
 }
 ```
 
-### 5. `/turn` - Turn.io WhatsApp Integration
+### 6. `/turn` - Turn.io WhatsApp Integration
 
 Integrates with [Turn.io](https://whatsapp.turn.io/docs/api/context) for WhatsApp chat-based telehealth consultations.
 

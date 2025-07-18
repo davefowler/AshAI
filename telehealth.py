@@ -82,60 +82,59 @@ class TelehealthAgent:
         """Extract medical queries from conversation and profile"""
         queries = []
         
-        # Extract from user messages
-        for message in messages:
-            if message.role.lower() == "user":
-                content = message.content.lower()
-                
-                # Look for medical questions and concerns
-                if any(word in content for word in ["pregnant", "pregnancy", "baby", "fetus"]):
-                    queries.append("pregnancy health concerns")
-                
-                if any(word in content for word in ["eat", "food", "diet", "nutrition"]):
-                    queries.append("pregnancy nutrition guidelines")
-                
-                if any(word in content for word in ["symptom", "pain", "discomfort", "problem", "headache", "head ache", "migraine"]):
-                    queries.append("pregnancy symptoms and complications")
-                
-                if any(word in content for word in ["medicine", "medication", "drug", "pill"]):
-                    queries.append("pregnancy medication safety")
-                
-                if any(word in content for word in ["exercise", "workout", "activity", "fitness"]):
-                    queries.append("pregnancy exercise guidelines")
-                
-                # General medical conditions (not just pregnancy)
-                if any(word in content for word in ["headache", "head ache", "migraine", "head pain"]):
-                    queries.append("headache causes and treatment")
-                
-                if any(word in content for word in ["fever", "temperature", "hot"]):
-                    queries.append("fever management and treatment")
-                
-                if any(word in content for word in ["cough", "cold", "flu", "sick"]):
-                    queries.append("respiratory symptoms and treatment")
-                
-                if any(word in content for word in ["stomach", "nausea", "vomit", "diarrhea"]):
-                    queries.append("gastrointestinal symptoms")
-                
-                if any(word in content for word in ["tired", "fatigue", "exhausted", "sleep"]):
-                    queries.append("fatigue and sleep issues")
-                
-                if any(word in content for word in ["anxiety", "stress", "depression", "mental"]):
-                    queries.append("mental health concerns")
-                
-                # Generic medical terms
-                if any(word in content for word in ["hurt", "pain", "ache", "sore", "uncomfortable"]):
-                    queries.append("general pain management")
-                
-                if any(word in content for word in ["symptom", "sign", "problem", "issue", "concern"]):
-                    queries.append("general medical symptoms")
+        # Get the latest user message to focus on their specific question
+        latest_message = self._get_latest_user_message(messages)
+        if not latest_message:
+            return ["general health guidelines"]
         
-        # Extract from profile
+        content = latest_message.content.lower()
+        
+        # Build very specific queries based on the user's exact question
+        # Combine pregnancy status with specific concerns
+        is_pregnant = any(word in content for word in ["pregnant", "pregnancy", "baby", "fetus"])
+        
+        if is_pregnant:
+            # For pregnancy-related queries, be very specific
+            if any(word in content for word in ["eat", "food", "diet", "nutrition", "banana", "fruit", "vegetable"]):
+                queries.append("pregnancy nutrition diet food safety")
+            elif any(word in content for word in ["headache", "head ache", "migraine", "head pain"]):
+                queries.append("pregnancy headache management")
+            elif any(word in content for word in ["pain", "ache", "discomfort", "hurt"]):
+                queries.append("pregnancy pain management")
+            elif any(word in content for word in ["medicine", "medication", "drug", "pill", "treatment"]):
+                queries.append("pregnancy medication safety")
+            elif any(word in content for word in ["exercise", "activity", "work", "movement"]):
+                queries.append("pregnancy exercise safety")
+            elif any(word in content for word in ["sleep", "rest", "tired", "fatigue"]):
+                queries.append("pregnancy sleep rest")
+            else:
+                # General pregnancy query
+                queries.append("pregnancy health care")
+        else:
+            # For non-pregnancy queries, be specific about the symptom/concern
+            if any(word in content for word in ["headache", "head ache", "migraine", "head pain"]):
+                queries.append("headache treatment management")
+            elif any(word in content for word in ["fever", "temperature", "hot"]):
+                queries.append("fever management treatment")
+            elif any(word in content for word in ["cough", "cold", "flu", "sick"]):
+                queries.append("respiratory symptoms treatment")
+            elif any(word in content for word in ["pain", "ache", "discomfort", "hurt"]):
+                queries.append("pain management treatment")
+            elif any(word in content for word in ["eat", "food", "diet", "nutrition"]):
+                queries.append("nutrition diet guidelines")
+            else:
+                # Use the user's actual words for the query
+                # Clean up the message to create a focused medical query
+                query_words = [word for word in content.split() if len(word) > 2 and word not in ["hello", "hi", "can", "you", "help", "please", "thank", "thanks"]]
+                if query_words:
+                    queries.append(" ".join(query_words[:5]))  # Use first 5 meaningful words
+                else:
+                    queries.append("general health guidelines")
+        
+        # Extract from profile for additional context
         profile_lower = profile.lower()
-        if "prenatal" in profile_lower or "pregnant" in profile_lower:
-            queries.append("prenatal care guidelines")
-        
-        if "itching" in profile_lower:
-            queries.append("pregnancy itching causes and treatment")
+        if "itching" in profile_lower and is_pregnant:
+            queries.append("pregnancy itching causes treatment")
         
         # Remove duplicates while preserving order
         seen = set()
@@ -145,7 +144,7 @@ class TelehealthAgent:
                 seen.add(query)
                 unique_queries.append(query)
         
-        return unique_queries[:3]  # Limit to 3 most relevant queries
+        return unique_queries[:2]  # Limit to 2 most relevant queries to reduce noise
     
     def _generate_response(self, user_message: str, faqs: List[WebFAQResult], profile: str, messages: Optional[List[Message]] = None) -> str:
         """Generate a personalized response based on FAQs and profile"""
@@ -173,6 +172,10 @@ class TelehealthAgent:
             response_parts.append(f"Hello {profile_info['name']}! I'm here to help you with your health questions.")
         else:
             response_parts.append("Hello! I'm here to help you with your health questions.")
+        
+        # Directly address the user's specific question
+        response_parts.append(f"Regarding your question: \"{user_message}\"")
+        response_parts.append("Let me provide you with specific medical information:")
         
         # Address the specific question
         user_lower = user_message.lower()
@@ -203,9 +206,12 @@ class TelehealthAgent:
             
             else:
                 # General pregnancy information
-                if faqs:
+                relevant_faq = self._find_most_relevant_faq(user_message, faqs)
+                if relevant_faq:
                     response_parts.append("Based on current medical research:")
-                    response_parts.append(faqs[0].answer)
+                    response_parts.append(relevant_faq.answer)
+                else:
+                    response_parts.append("I understand you have pregnancy-related questions. Please consult with your healthcare provider for personalized prenatal care advice.")
         
         # General medical queries
         elif any(word in user_lower for word in ["headache", "head ache", "migraine", "head pain"]):
@@ -237,10 +243,11 @@ class TelehealthAgent:
                 response_parts.append("Respiratory symptoms can be caused by various conditions. Rest, hydration, and monitoring your symptoms are important. Consult with your healthcare provider if symptoms worsen.")
         
         else:
-            # General medical information
-            if faqs:
+            # Try to find the most relevant FAQ based on user message keywords
+            relevant_faq = self._find_most_relevant_faq(user_message, faqs)
+            if relevant_faq:
                 response_parts.append("Based on current medical research:")
-                response_parts.append(faqs[0].answer)
+                response_parts.append(relevant_faq.answer)
             else:
                 response_parts.append("I understand you have health concerns. It's important to discuss your specific symptoms with your healthcare provider for personalized medical advice.")
         
@@ -252,6 +259,45 @@ class TelehealthAgent:
         response_parts.append("Remember: This information is for educational purposes only. Always consult with your healthcare provider for personalized medical advice.")
         
         return " ".join(response_parts)
+    
+    def _find_most_relevant_faq(self, user_message: str, faqs: List[WebFAQResult]) -> Optional[WebFAQResult]:
+        """Find the most relevant FAQ based on user message keywords"""
+        if not faqs:
+            return None
+        
+        user_lower = user_message.lower()
+        user_words = set(user_lower.split())
+        
+        best_faq = None
+        best_score = 0
+        
+        for faq in faqs:
+            score = 0
+            faq_text = (faq.question + " " + faq.answer).lower()
+            faq_words = set(faq_text.split())
+            
+            # Calculate relevance score based on word overlap
+            common_words = user_words.intersection(faq_words)
+            score = len(common_words)
+            
+            # Boost score for important medical terms
+            important_terms = ['pregnancy', 'pregnant', 'baby', 'nutrition', 'diet', 'headache', 'pain', 'symptom', 'treatment', 'health']
+            for term in important_terms:
+                if term in user_lower and term in faq_text:
+                    score += 3
+            
+            # Penalize completely unrelated topics
+            unrelated_terms = ['microplastic', 'plastic', 'adolescent', 'thyroid', 'spina bifida']
+            for term in unrelated_terms:
+                if term in faq_text and term not in user_lower:
+                    score -= 5
+            
+            if score > best_score:
+                best_score = score
+                best_faq = faq
+        
+        # Only return if we have a reasonable relevance score
+        return best_faq if best_score > 2 else None
     
     def _parse_profile(self, profile: str) -> Dict[str, str]:
         """Parse patient profile information"""

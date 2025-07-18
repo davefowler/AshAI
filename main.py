@@ -9,6 +9,7 @@ from models import (
 )
 from telehealth import process_telehealth_request
 from evaluator import evaluate_telehealth_response
+from niharika_faq import search_niharika_faqs
 
 # Create FastAPI app
 app = FastAPI(
@@ -57,7 +58,11 @@ async def search_medical_faq(query: FAQQuery) -> FAQResponse:
     """
     try:
         # Search PubMed using the pubmed module
-        raw_results = pubmed.search_and_fetch(query.query, max_results=query.max_results or 3)
+        raw_results = pubmed.search_and_fetch(
+            query.query, 
+            max_results=query.max_results or 3,
+            snippet_length=query.snippet_length or 500
+        )
         
         if not raw_results:
             # Return empty results if no articles found
@@ -70,10 +75,16 @@ async def search_medical_faq(query: FAQQuery) -> FAQResponse:
         # Synthesize FAQ responses from multiple sources
         faq_results = _synthesize_faq_results(query.query, raw_results)
         
+        # Apply relevance filtering if threshold is specified
+        if query.relevance_threshold is not None:
+            filtered_results = _filter_by_relevance(query.query, faq_results, query.relevance_threshold)
+        else:
+            filtered_results = faq_results
+        
         return FAQResponse(
-            results=faq_results,
+            results=filtered_results,
             query=query.query,
-            total_results=len(faq_results)
+            total_results=len(filtered_results)
         )
         
     except Exception as e:
@@ -150,6 +161,35 @@ def _synthesize_faq_results(query: str, raw_results: List[WebFAQResult]) -> List
     return faq_results
 
 
+def _filter_by_relevance(query: str, faqs: List[WebFAQResult], threshold: float) -> List[WebFAQResult]:
+    """Filter FAQ results by relevance score"""
+    filtered = []
+    query_words = set(query.lower().split())
+    
+    for faq in faqs:
+        # Combine question and answer text
+        faq_text = (faq.question + " " + faq.answer).lower()
+        faq_words = set(faq_text.split())
+        
+        # Calculate word overlap score
+        common_words = query_words.intersection(faq_words)
+        overlap_score = len(common_words) / max(len(query_words), 1)  # Avoid division by zero
+        
+        # Boost score for medical terms
+        medical_terms = ['pregnancy', 'pregnant', 'baby', 'nutrition', 'diet', 'headache', 'pain', 'symptom', 'treatment']
+        term_matches = sum(1 for term in medical_terms if term in query.lower() and term in faq_text)
+        term_boost = term_matches * 0.1  # Each matching term adds 0.1 to score
+        
+        # Calculate final relevance score
+        relevance = min(1.0, overlap_score + term_boost)
+        
+        # Add FAQ if it meets the threshold
+        if relevance >= threshold:
+            filtered.append(faq)
+    
+    return filtered
+
+
 @app.post("/sources", response_model=SourcesResponse)
 async def get_raw_sources(query: FAQQuery) -> SourcesResponse:
     """
@@ -165,7 +205,11 @@ async def get_raw_sources(query: FAQQuery) -> SourcesResponse:
     """
     try:
         # Search PubMed using the pubmed module
-        results = pubmed.search_and_fetch(query.query, max_results=query.max_results or 3)
+        results = pubmed.search_and_fetch(
+            query.query, 
+            max_results=query.max_results or 3,
+            snippet_length=query.snippet_length or 500
+        )
         
         if not results:
             # Return empty results if no articles found
@@ -510,6 +554,45 @@ def get_medical_faq(question: str) -> str:
         
     except Exception as e:
         return f"An error occurred while searching for medical information: {str(e)}"
+
+
+@app.post("/faq/niharika", response_model=FAQResponse)
+async def search_niharika_faq(query: FAQQuery) -> FAQResponse:
+    """
+    Search Niharika FAQ data from Google Sheets.
+    
+    This endpoint searches a curated Google Sheet containing Bengali/English 
+    medical Q&A pairs specifically for pregnancy and maternal health.
+    
+    - **query**: The medical question to search for
+    - **max_results**: Maximum number of results (1-10, default: 3)
+    - **snippet_length**: Length of content snippets (not used for this endpoint)
+    
+    Returns FAQ responses from the Niharika Google Sheet database.
+    """
+    try:
+        # Search Niharika FAQ data
+        results = search_niharika_faqs(query.query, max_results=query.max_results or 3)
+        
+        if not results:
+            # Return empty results if no FAQs found
+            return FAQResponse(
+                results=[],
+                query=query.query,
+                total_results=0
+            )
+        
+        return FAQResponse(
+            results=results,
+            query=query.query,
+            total_results=len(results)
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error searching Niharika FAQ data: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

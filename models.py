@@ -23,7 +23,9 @@ class FAQQuery(BaseModel):
     """Input query for the FAQ search"""
     query: str = Field(..., description="Medical question to search for", min_length=1)
     max_results: Optional[int] = Field(3, description="Maximum number of results to return", ge=1, le=10)
+    snippet_length: Optional[int] = Field(500, description="Length of content snippets in characters", ge=100, le=2000)
     population_filter: Optional[str] = Field(None, description="Filter by population (e.g., 'pregnancy', 'cardiac')")
+    relevance_threshold: Optional[float] = Field(0.3, description="Minimum relevance score (0.0-1.0) to include results", ge=0.0, le=1.0)
 
 
 class FAQResponse(BaseModel):

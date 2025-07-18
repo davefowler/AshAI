@@ -119,21 +119,29 @@
         }
         .copy-button {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
+            top: 8px;
+            right: 8px;
+            background-color: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+            padding: 4px 8px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            width: auto;
+            min-width: 60px;
         }
         .copy-button:hover {
-            background-color: #0056b3;
+            background-color: #e9ecef;
+            color: #495057;
+            border-color: #adb5bd;
         }
         .copy-button.copied {
-            background-color: #28a745;
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
         }
         .pretty-json {
             font-family: 'Inter', sans-serif;
@@ -229,6 +237,7 @@
                 <option value="/ashai">/ashai - AI Telehealth Agent</option>
                 <option value="/evaluator">/evaluator - Response Evaluation</option>
                 <option value="/faq">/faq - Medical FAQ Search</option>
+                <option value="/faq/niharika">/faq/niharika - Niharika FAQ (Bengali/English)</option>
                 <option value="/sources">/sources - Raw PubMed Sources</option>
                 <option value="/turn">/turn - Turn.io Integration</option>
             </select>
@@ -267,11 +276,17 @@
 }`,
             '/faq': `{
   "query": "pregnancy nutrition guidelines",
+  "max_results": 3,
+  "snippet_length": 500
+}`,
+            '/faq/niharika': `{
+  "query": "neck pain headache pregnancy",
   "max_results": 3
 }`,
             '/sources': `{
   "query": "postpartum depression symptoms",
-  "max_results": 2
+  "max_results": 2,
+  "snippet_length": 500
 }`,
             '/turn': `{
   "chat": {
@@ -435,6 +450,15 @@
             });
         }
 
+        function copyRawJSON() {
+            const rawView = document.getElementById('raw-view');
+            if (rawView) {
+                // Get the JSON content, excluding the button
+                const jsonContent = rawView.textContent.replace('Copy', '').trim();
+                copyToClipboard(jsonContent);
+            }
+        }
+
         function toggleView(viewType) {
             const rawView = document.getElementById('raw-view');
             const prettyView = document.getElementById('pretty-view');
@@ -492,7 +516,7 @@
                 // Create both views
                 const prettyView = `<div id="pretty-view">${prettyPrintJSON(responseData)}</div>`;
                 const rawView = `<div id="raw-view" style="display: none;" class="raw-json">
-                    <button class="copy-button" onclick="copyToClipboard(\`${JSON.stringify(responseData, null, 2).replace(/`/g, '\\`')}\`)">Copy</button>
+                    <button class="copy-button" onclick="copyRawJSON()">Copy</button>
                     ${JSON.stringify(responseData, null, 2)}
                 </div>`;
                 
