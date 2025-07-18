@@ -1,171 +1,64 @@
-# WebFAQMCP: Medical FAQ Tool using PubMed
+# AshAI - AI Telehealth Agent
 
-A Python tool that searches PubMed for medical literature and returns structured FAQ-style answers to health questions. Perfect for integration with AI assistants, chatbots, or standalone medical information systems.
+> **Asha** (आशा) means "hope" in Hindi and refers to community health workers who support mothers and families. AshAI combines this concept with AI to create an intelligent telehealth agent for maternal and family health.
 
-## 🔍 What It Does
+AshAI is a comprehensive telehealth platform that provides evidence-based medical information through multiple AI-powered endpoints. Built on PubMed research, it offers personalized health guidance with cultural sensitivity and quality evaluation.
 
-- Takes natural language medical questions (e.g., "What causes morning headaches?")
-- Searches the **NCBI PubMed database** using E-utilities API
-- Returns structured results with:
-  - Article titles
-  - Abstract snippets (first 300 characters)
-  - Direct PubMed URLs
-  - Medical disclaimers
+## 🌟 Features
 
-## 🧠 Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| API Framework | FastAPI |
-| Data Validation | Pydantic |
-| Medical Data | PubMed E-utilities |
-| HTTP Client | Requests |
-| Language | Python 3.10+ |
-
-## 📁 Project Structure
-
-```
-pubMedFAQ/
-├── main.py                  # FastAPI entrypoint
-├── tools.py                 # Core tool logic
-├── models.py                # Pydantic data models
-├── pubmed.py                # PubMed API interaction
-├── test_webfaq.py           # Tests
-├── requirements.txt         # Dependencies
-└── README.md               # This file
-```
+- **🤖 AI Telehealth Agent** - Conversational health assistant with cultural sensitivity
+- **📚 Evidence-Based Responses** - All information sourced from PubMed medical literature
+- **🌏 Multi-Cultural Support** - Hindi language support and cultural awareness
+- **📊 Quality Evaluation** - Automated assessment of response quality
+- **🔍 Medical FAQ Search** - Structured Q&A from medical research
+- **📖 Raw Source Access** - Direct access to PubMed abstracts and sources
+- **🖥️ Interactive Web UI** - Easy-to-use interface for testing all endpoints
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### Installation
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd pubMedFAQ
+git clone <repository-url>
+cd AshAI
 
 # Create virtual environment
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Start the server
+python main.py
 ```
 
-### 2. Run the API Server
+The server will start at `http://localhost:8000`
 
-```bash
-./run.sh
-```
+### Web Interface
 
-The API will be available at `http://localhost:8000`
+Visit `http://localhost:8000/` for an interactive web UI that allows you to:
+- **Select API endpoints** from a dropdown menu
+- **Auto-fill example requests** when switching endpoints
+- **Send requests** and view formatted responses
+- **Test all endpoints** without using curl or other tools
 
-### 3. Test the API
+### API Documentation
 
-**FAQ Endpoint (structured results):**
-```bash
-curl -X POST http://localhost:8000/faq \
-  -H "Content-Type: application/json" \
-  -d '{"query": "pregnancy morning sickness"}'
-```
+Once running, visit:
+- **Interactive API docs**: `http://localhost:8000/docs`
+- **ReDoc documentation**: `http://localhost:8000/redoc`
 
-**Sources Endpoint (raw snippets):**
-```bash
-curl -X POST http://localhost:8000/sources \
-  -H "Content-Type: application/json" \
-  -d '{"query": "postpartum depression symptoms"}'
-```
+## 📡 API Endpoints
 
-**With custom result count:**
-```bash
-curl -X POST http://localhost:8000/faq \
-  -H "Content-Type: application/json" \
-  -d '{"query": "cardiac rehabilitation", "max_results": 5}'
-```
+### 1. `/ashai` - AI Telehealth Agent
 
-**Telehealth Agent Endpoint:**
-```bash
-curl -X POST http://localhost:8000/ashai \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"role": "user", "content": "hello, i am pregnant"},
-      {"role": "user", "content": "can i eat banana?"}
-    ],
-    "profile": "Name: Ann\nLocation: Kerala India\nLanguage: Hindi\nCategory: Prenatal\nPatient History: They have had issues with itching."
-  }'
-```
+**POST** `/ashai`
 
-**Evaluation Endpoint:**
-```bash
-curl -X POST http://localhost:8000/evaluator \
-  -H "Content-Type: application/json" \
-  -d '{
-    "response": "Hello Ann! I am here to help you with your pregnancy-related questions. Regarding your question about food and nutrition during pregnancy: Based on medical research, bananas are generally safe and nutritious during pregnancy...",
-    "context": "Patient asked about eating bananas during pregnancy",
-    "profile": "Name: Ann\nLocation: Kerala India\nLanguage: Hindi\nCategory: Prenatal\nPatient History: They have had issues with itching."
-  }'
-```
+A higher-level telehealth agent that responds to user input based on PubMed research and patient profile information. The agent **self-evaluates** its responses and automatically retries with improved instructions if the evaluation score is low (below 7.0/10).
 
-## 📖 Usage Examples
-
-### API Endpoints
-
-**POST** `/faq` - Medical FAQ Search
-
-```json
-{
-  "query": "What are the symptoms of diabetes?"
-}
-```
-
-**Response:**
-```json
-{
-  "results": [
-    {
-      "title": "Type 2 diabetes mellitus: clinical manifestations and diagnosis",
-      "snippet": "Type 2 diabetes mellitus is characterized by hyperglycemia, insulin resistance, and relative insulin deficiency. Common symptoms include polyuria, polydipsia, polyphagia, weight loss, and fatigue...",
-      "url": "https://pubmed.ncbi.nlm.nih.gov/12345678/"
-    }
-  ],
-  "query": "What are the symptoms of diabetes?",
-  "total_results": 3
-}
-```
-
-### Python Usage
-
-```python
-from pubmed import search_and_fetch
-
-# Search PubMed directly
-results = search_and_fetch("morning headaches", max_results=3)
-
-for result in results:
-    print(f"Title: {result.title}")
-    print(f"Snippet: {result.snippet}")
-    print(f"URL: {result.url}")
-    print("-" * 50)
-```
-
-### Jupyter Notebook Usage
-
-```python
-import pubmed
-
-# Quick search
-results = pubmed.search_and_fetch("sleep apnea treatment")
-
-# Display results
-for i, result in enumerate(results, 1):
-    print(f"{i}. {result.question}")
-    print(f"   {result.answer}")
-    print(f"   🔗 {result.sources[0].url}\n")
-```
-
-**POST** `/ashai` - AI Telehealth Agent
-
+**Request Body:**
 ```json
 {
   "messages": [
@@ -179,35 +72,62 @@ for i, result in enumerate(results, 1):
 **Response:**
 ```json
 {
-  "response": "Hello Ann! I'm here to help you with your pregnancy-related questions. Regarding your question about food and nutrition during pregnancy: Based on medical research, bananas are generally safe and nutritious during pregnancy...",
+  "response": "Hello Ann! I'm here to help you with your pregnancy-related questions...",
   "sources": [
     {
-      "title": "Nutrition during pregnancy",
+      "title": "Pregnancy Nutrition Guidelines",
       "pmid": "12345678",
       "url": "https://pubmed.ncbi.nlm.nih.gov/12345678/"
     }
   ],
-  "faqs": [
-    {
-      "question": "What foods are safe during pregnancy?",
-      "answer": "Based on medical research...",
-      "sources": [...],
-      "publication_date": "2023-01-01",
-      "population": "Pregnant women"
-    }
-  ],
-  "evaluation": null
+  "faqs": [...],
+  "evaluation": {
+    "medical_accuracy": 85.0,
+    "precision": 78.0,
+    "language_clarity": 82.0,
+    "empathy_score": 88.0,
+    "overall_score": 83.5,
+    "feedback": "Good medical accuracy and empathy, could improve precision..."
+  }
 }
 ```
 
-**POST** `/evaluator` - Response Evaluation
+**Features:**
+- **Self-Evaluation**: Automatically evaluates responses using the same criteria as `/evaluator`
+- **Auto-Retry**: If score < 7.0, retries with evaluation feedback as system message
+- **Cultural Sensitivity**: Supports multiple languages (Hindi, English)
+- **Evidence-Based**: All responses backed by PubMed research
+- **Personalized**: Uses patient profile for tailored responses
 
-```json
-{
-  "response": "Hello Ann! I am here to help you with your pregnancy-related questions...",
-  "context": "Patient asked about eating bananas during pregnancy",
-  "profile": "Name: Ann\nLocation: Kerala India\nLanguage: Hindi\nCategory: Prenatal\nPatient History: They have had issues with itching."
-}
+**Example:**
+```bash
+curl -X POST http://localhost:8000/ashai \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "hello, i am pregnant"},
+      {"role": "user", "content": "can i eat banana?"}
+    ],
+    "profile": "Name: Ann\nLocation: Kerala India\nLanguage: Hindi\nCategory: Prenatal\nPatient History: They have had issues with itching."
+  }'
+```
+
+### 2. `/evaluator` - Response Quality Assessment
+
+Evaluates telehealth responses based on multiple criteria.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/evaluator \
+  -H "Content-Type: application/json" \
+  -d '{
+    "response": "Hello Ann! I am here to help you with your pregnancy-related questions...",
+    "messages": [
+      {"role": "user", "content": "hello, i am pregnant"},
+      {"role": "user", "content": "can i eat banana?"}
+    ],
+    "profile": "Name: Ann\nLocation: Kerala India\nLanguage: Hindi\nCategory: Prenatal\nPatient History: They have had issues with itching."
+  }'
 ```
 
 **Response:**
@@ -218,14 +138,218 @@ for i, result in enumerate(results, 1):
   "language_clarity": 82.0,
   "empathy_score": 88.0,
   "overall_score": 83.7,
-  "feedback": "Excellent response! This is a high-quality telehealth interaction. Excellent medical accuracy with appropriate safety warnings..."
+  "feedback": "Excellent response! This is a high-quality telehealth interaction..."
 }
+```
+
+**Evaluation Criteria:**
+- **Medical Accuracy (40%)** - Evidence-based information and safety warnings
+- **Precision (25%)** - Addresses specific patient concerns
+- **Language Clarity (20%)** - Accessible language without medical jargon
+- **Empathy Score (15%)** - Personalization and cultural sensitivity
+
+### 3. `/faq` - Medical FAQ Search
+
+Synthesizes multiple PubMed sources into structured Q&A pairs.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/faq \
+  -H "Content-Type: application/json" \
+  -d '{"query": "pregnancy nutrition guidelines", "max_results": 3}'
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "question": "What is pregnancy nutrition?",
+      "answer": "Based on medical research: Nutritional concerns in pregnancy are gaining increasing importance...",
+      "sources": [
+        {
+          "title": "Nutrition during pregnancy",
+          "pmid": "18760225",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/18760225/"
+        }
+      ],
+      "publication_date": "2008-Sep-01",
+      "population": "Pregnant women"
+    }
+  ],
+  "query": "pregnancy nutrition guidelines",
+  "total_results": 1
+}
+```
+
+### 4. `/sources` - Raw PubMed Sources
+
+Returns raw snippets from individual PubMed articles.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/sources \
+  -H "Content-Type: application/json" \
+  -d '{"query": "postpartum depression symptoms"}'
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "question": "Postpartum depression: A systematic review",
+      "answer": "Postpartum depression affects approximately 10-15% of women...",
+      "sources": [...],
+      "publication_date": "2020-01-01",
+      "population": "Postpartum women"
+    }
+  ],
+  "query": "postpartum depression symptoms",
+  "total_results": 1
+}
+```
+
+### 5. `/turn` - Turn.io WhatsApp Integration
+
+Integrates with [Turn.io](https://whatsapp.turn.io/docs/api/context) for WhatsApp chat-based telehealth consultations.
+
+**Handshake Request:**
+```bash
+curl -X POST "http://localhost:8000/turn?handshake=true"
+```
+
+**Response:**
+```json
+{
+  "version": "1.0.0-alpha",
+  "capabilities": {
+    "actions": true,
+    "suggested_responses": true,
+    "context_objects": [
+      {
+        "title": "Patient Information",
+        "code": "patient_info",
+        "type": "table"
+      },
+      {
+        "title": "Medical Context", 
+        "code": "medical_context",
+        "type": "ordered-list"
+      }
+    ]
+  }
+}
+```
+
+**Context Retrieval Request:**
+```bash
+curl -X POST http://localhost:8000/turn \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chat": {
+      "owner": "+1234567890",
+      "state": "active"
+    },
+    "messages": [
+      {
+        "direction": "inbound",
+        "text": "hello, i have a headache",
+        "timestamp": "2024-01-01T12:00:00Z"
+      },
+      {
+        "direction": "outbound",
+        "text": "Hello! I can help. Can you tell me more?",
+        "timestamp": "2024-01-01T12:01:00Z"
+      },
+      {
+        "direction": "inbound", 
+        "text": "it has been going on for 2 days",
+        "timestamp": "2024-01-01T12:02:00Z"
+      }
+    ]
+  }'
+```
+
+**Response:**
+```json
+{
+  "version": "1.0.0-alpha",
+  "context_objects": {
+    "patient_info": {
+      "Phone Number": "+1234567890",
+      "Chat State": "active",
+      "Response Quality": "8.5/10"
+    },
+    "medical_context": [
+      "**Medical Sources**: 3 PubMed articles",
+      "**Response Length**: 245 characters", 
+      "**FAQs Used**: 2 medical FAQs"
+    ]
+  },
+  "actions": {},
+  "suggested_responses": [
+    {
+      "type": "TEXT",
+      "title": "Medical Response",
+      "body": "Based on medical research, headaches lasting more than 24 hours may require medical attention...",
+      "confidence": 0.9
+    },
+    {
+      "type": "TEXT",
+      "title": "Medical Disclaimer", 
+      "body": "This information is for educational purposes only. Please consult with your healthcare provider for personalized medical advice.",
+      "confidence": 0.7
+    }
+  ]
+}
+```
+
+**Features:**
+- **WhatsApp Integration**: Seamless integration with Turn.io WhatsApp platform
+- **Auto-Response**: Converts chat messages to medical consultations
+- **Context Display**: Shows patient info and medical context in Turn.io UI
+- **Suggested Responses**: Provides multiple response options for agents
+- **Self-Evaluation**: Includes response quality scoring
+
+## 🧪 Testing
+
+### Web Interface Testing
+The easiest way to test all endpoints is through the web interface:
+
+1. **Start the server**: `python main.py`
+2. **Open your browser**: Visit `http://localhost:8000/`
+3. **Select an endpoint** from the dropdown
+4. **Review the auto-filled example** (or modify it)
+5. **Click "Send Request"** to test the API
+6. **View results** in the formatted display area
+
+The web UI automatically provides relevant examples for each endpoint:
+- **`/ashai`**: Pregnancy nutrition question with Hindi-speaking patient
+- **`/evaluator`**: Sample response evaluation with context
+- **`/faq`**: Pregnancy nutrition guidelines search
+- **`/sources`**: Postpartum depression symptoms search
+
+### Command Line Testing
+
+#### Run All Tests
+```bash
+python test_webfaq.py
+```
+
+#### Test New Endpoints
+```bash
+python test_telehealth.py
+```
+
+#### Quick Example
+```bash
+python example.py
 ```
 
 ## 🔧 Configuration
 
 ### Email Configuration (Recommended)
-
 NCBI recommends providing your email when using their APIs:
 
 ```python
@@ -236,59 +360,107 @@ results = api.search_and_fetch("your query")
 ```
 
 ### Environment Variables
-
-You can set these environment variables:
-
 ```bash
 export PUBMED_EMAIL="your-email@example.com"
-export PUBMED_TOOL="your-tool-name"
+export PUBMED_TOOL="ashai-telehealth"
 ```
 
-## 🧪 Testing
+## 🏗️ Architecture
 
-Run the test suite:
+### Core Components
 
-```bash
-python -m pytest test_webfaq.py -v
-```
+1. **Telehealth Agent** (`telehealth.py`)
+   - Conversation processing
+   - Medical query extraction
+   - Personalized response generation
+   - Cultural sensitivity
 
-Or run individual tests:
+2. **Evaluation Agent** (`evaluator.py`)
+   - Multi-criteria assessment
+   - Quality scoring
+   - Feedback generation
 
-```bash
-python test_webfaq.py
-```
+3. **PubMed Integration** (`pubmed.py`)
+   - NCBI E-utilities API
+   - Article search and retrieval
+   - Metadata extraction
 
-## 📊 API Documentation
+4. **API Layer** (`main.py`)
+   - FastAPI endpoints
+   - Request/response handling
+   - Error management
 
-Once the server is running, visit:
-- **Interactive API docs**: `http://localhost:8000/docs`
-- **ReDoc documentation**: `http://localhost:8000/redoc`
+5. **Web Interface** (`templates/index.html`)
+   - Interactive UI for testing endpoints
+   - Auto-filling examples
+   - Real-time API testing
 
-## 🔒 Medical Disclaimer
+### Data Models
 
-**Important:** This tool provides information for educational purposes only and should not replace professional medical advice. All responses include appropriate medical disclaimers.
+- **TelehealthRequest/Response** - Chat-based interactions
+- **EvaluationRequest/Response** - Quality assessment
+- **FAQQuery/Response** - Medical Q&A
+- **Source** - PubMed article metadata
 
-The tool retrieves information from:
-- **PubMed**: Public domain medical literature from NCBI
-- **No PHI**: No personal health information is processed
-- **Peer-reviewed**: Only accesses peer-reviewed medical literature
+## 🌏 Cultural Features
 
-## 🛡️ Rate Limiting & Best Practices
+### Hindi Language Support
+- Automatic Hindi text inclusion for Indian patients
+- Cultural context awareness
+- Appropriate greetings and phrases
 
-- **NCBI Guidelines**: Respects NCBI's usage guidelines
-- **Rate Limiting**: Built-in request throttling
-- **Caching**: Consider implementing caching for production use
-- **Error Handling**: Graceful fallbacks for API failures
+### Cultural Sensitivity
+- Location-aware responses (e.g., Kerala, India)
+- Regional health considerations
+- Traditional medicine awareness
 
-## 🔧 Development
+## 🔒 Medical Safety
 
-### Adding New Features
+### Built-in Safeguards
+- **Educational Purpose Disclaimers** - All responses include appropriate warnings
+- **Healthcare Provider Recommendations** - Always suggest consulting professionals
+- **Evidence-Based Information** - All responses backed by PubMed research
+- **No Personal Health Information** - No PHI processing or storage
 
-1. **New search filters**: Extend `PubMedAPI._search_articles()`
-2. **Response formatting**: Modify `_format_results()`
-3. **Additional metadata**: Update `WebFAQResult` model
+### Quality Assurance
+- **Automated Evaluation** - Every response can be quality-assessed
+- **Medical Accuracy Scoring** - Evidence-based information validation
+- **Safety Warning Detection** - Ensures appropriate disclaimers
 
-### Contributing
+## 📊 Use Cases
+
+### For Healthcare Providers
+- **Patient Education** - Evidence-based information for patients
+- **Quality Assurance** - Evaluate response quality
+- **Research Support** - Access to medical literature
+
+### For Patients
+- **Health Information** - Reliable medical guidance
+- **Cultural Support** - Language and cultural sensitivity
+- **Education** - Understanding health conditions
+
+### For Developers
+- **API Integration** - Build healthcare applications
+- **Custom Evaluation** - Implement quality assessment
+- **Research Tools** - Medical literature access
+
+## 🛡️ Security & Compliance
+
+- **No PHI Storage** - No personal health information stored
+- **Public Data Only** - Uses only publicly available PubMed data
+- **Educational Use** - Designed for educational purposes
+- **Professional Guidance** - Always recommends consulting healthcare providers
+
+## 📈 Roadmap
+
+- [ ] **Voice Interface** - Speech-to-text and text-to-speech
+- [ ] **Multi-Language Support** - Additional Indian languages
+- [ ] **Image Analysis** - Medical image interpretation
+- [ ] **Symptom Assessment** - Structured symptom evaluation
+- [ ] **Medication Safety** - Drug interaction checking
+- [ ] **Emergency Detection** - Critical symptom identification
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -296,52 +468,11 @@ The tool retrieves information from:
 4. Run the test suite
 5. Submit a pull request
 
-## 📋 Dependencies
-
-- `fastapi>=0.104.1`: Web framework
-- `uvicorn>=0.24.0`: ASGI server
-- `requests>=2.31.0`: HTTP client
-- `pydantic>=2.5.0`: Data validation
-- `python-multipart>=0.0.6`: Form data parsing
-- `pytest>=7.4.0`: Testing framework
-
-## 🚀 Deployment
-
-### Docker (Optional)
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Production Considerations
-
-- Use environment variables for configuration
-- Implement proper logging
-- Add rate limiting middleware
-- Consider database caching for frequent queries
-- Set up monitoring and health checks
-
-## 📈 Roadmap
-
-- [ ] Add metadata fields (publication date, authors, journal)
-- [ ] Implement caching layer
-- [ ] Add batch query support
-- [ ] Integration with other medical databases
-- [ ] Voice interface support
-- [ ] Full-text search capabilities
-
 ## 📞 Support
 
 For issues, questions, or contributions:
 - Create an issue on GitHub
-- Check the API documentation
+- Check the API documentation at `/docs`
 - Review the test cases for usage examples
 
 ## 📄 License
@@ -350,4 +481,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Made with ❤️ for the medical AI community** 
+**Made with ❤️ for maternal and family health**
+
+*AshAI - Bringing hope and AI together for better health outcomes* 

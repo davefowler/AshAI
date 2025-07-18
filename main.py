@@ -1,19 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Dict, Any
 import pubmed
 from models import (
     FAQQuery, FAQResponse, WebFAQResult, Source,
     TelehealthRequest, TelehealthResponse,
-    EvaluationRequest, EvaluationResponse
+    EvaluationRequest, EvaluationResponse, Message, SourcesResponse
 )
 from telehealth import process_telehealth_request
 from evaluator import evaluate_telehealth_response
 
 # Create FastAPI app
 app = FastAPI(
-    title="WebFAQMCP",
-    description="Medical FAQ tool using PubMed research",
+    title="AshAI - AI Telehealth Agent",
+    description="Comprehensive telehealth platform providing evidence-based medical information with cultural sensitivity",
     version="1.0.0"
 )
 
@@ -29,12 +29,14 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """Root endpoint with basic information"""
-    return {
-        "message": "WebFAQMCP: Medical FAQ API",
-        "description": "Search PubMed for medical literature and get structured FAQ-style answers",
-        "endpoint": "/faq"
-    }
+    """Root endpoint with simple web UI"""
+    try:
+        with open("templates/index.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        return {"error": "Template file not found. Please ensure templates/index.html exists."}
 
 
 # note this is like /sources but combines multiple sources/snippets into 
@@ -99,7 +101,8 @@ def _synthesize_faq_results(query: str, raw_results: List[WebFAQResult]) -> List
             sources.append(Source(
                 title=result.question,
                 pmid=first_source.pmid,
-                url=first_source.url
+                url=first_source.url,
+                content=result.answer
             ))
     
     # Create synthesized FAQ responses
@@ -147,8 +150,8 @@ def _synthesize_faq_results(query: str, raw_results: List[WebFAQResult]) -> List
     return faq_results
 
 
-@app.post("/sources", response_model=FAQResponse)
-async def get_raw_sources(query: FAQQuery) -> FAQResponse:
+@app.post("/sources", response_model=SourcesResponse)
+async def get_raw_sources(query: FAQQuery) -> SourcesResponse:
     """
     Get raw source snippets directly from PubMed abstracts.
     
@@ -166,16 +169,29 @@ async def get_raw_sources(query: FAQQuery) -> FAQResponse:
         
         if not results:
             # Return empty results if no articles found
-            return FAQResponse(
-                results=[],
+            return SourcesResponse(
+                sources=[],
                 query=query.query,
                 total_results=0
             )
         
-        return FAQResponse(
-            results=results,
+        # Convert to raw source format
+        raw_sources = []
+        for result in results:
+            # Each result has sources, extract the content from the answer
+            if result.sources:
+                for source in result.sources:
+                    raw_sources.append(Source(
+                        title=source.title,
+                        pmid=source.pmid,
+                        url=source.url,
+                        content=result.answer  # Use the answer as content snippet
+                    ))
+        
+        return SourcesResponse(
+            sources=raw_sources,
             query=query.query,
-            total_results=len(results)
+            total_results=len(raw_sources)
         )
         
     except Exception as e:
@@ -191,16 +207,99 @@ async def telehealth_agent(request: TelehealthRequest) -> TelehealthResponse:
     AI Telehealth Agent for patient interactions.
     
     This endpoint provides a higher-level telehealth agent that responds to user input
-    based on PubMed research and patient profile information.
+    based on PubMed research and patient profile information. The agent self-evaluates
+    its responses and retries with improved instructions if the evaluation score is low.
     
     - **messages**: List of chat messages with role and content
     - **profile**: Patient profile information (name, location, language, category, history)
     
-    Returns a personalized response with sources and FAQs used.
+    Returns a personalized response with sources, FAQs, and self-evaluation.
     """
     try:
-        response = process_telehealth_request(request)
-        return response
+        # Generate initial response
+        initial_response = process_telehealth_request(request)
+        
+        # Self-evaluate the response
+        evaluation_request = EvaluationRequest(
+            response=initial_response.response,
+            messages=request.messages,
+            profile=request.profile
+        )
+        
+        evaluation = evaluate_telehealth_response(evaluation_request)
+        
+        # Check if evaluation score is low (below 7.0 out of 10)
+        if evaluation.overall_score < 7.0:
+            # Create improved request with evaluation feedback
+            improved_messages = request.messages.copy()
+            
+            # Add system message with evaluation feedback
+            feedback_message = Message(
+                role="system",
+                content=f"""Your previous response received a low evaluation score ({evaluation.overall_score:.1f}/10). 
+                Please improve your response based on this feedback:
+                
+                Medical Accuracy ({evaluation.medical_accuracy:.1f}/10)
+                Precision ({evaluation.precision:.1f}/10)
+                Language Clarity ({evaluation.language_clarity:.1f}/10)
+                Empathy ({evaluation.empathy_score:.1f}/10)
+                
+                Detailed feedback: {evaluation.feedback}
+                
+                Focus on being more accurate, precise, clear, and empathetic in your response."""
+            )
+            
+            improved_messages.insert(0, feedback_message)
+            
+            # Generate improved response
+            improved_request = TelehealthRequest(
+                messages=improved_messages,
+                profile=request.profile
+            )
+            
+            improved_response = process_telehealth_request(improved_request)
+            
+            # Re-evaluate the improved response
+            improved_evaluation_request = EvaluationRequest(
+                response=improved_response.response,
+                messages=request.messages,  # Use original messages for evaluation
+                profile=request.profile
+            )
+            
+            improved_evaluation = evaluate_telehealth_response(improved_evaluation_request)
+            
+            # Return the better response
+            if improved_evaluation.overall_score > evaluation.overall_score:
+                improved_response.evaluation = {
+                    "medical_accuracy": improved_evaluation.medical_accuracy,
+                    "precision": improved_evaluation.precision,
+                    "language_clarity": improved_evaluation.language_clarity,
+                    "empathy_score": improved_evaluation.empathy_score,
+                    "overall_score": improved_evaluation.overall_score,
+                    "feedback": improved_evaluation.feedback
+                }
+                return improved_response
+            else:
+                initial_response.evaluation = {
+                    "medical_accuracy": evaluation.medical_accuracy,
+                    "precision": evaluation.precision,
+                    "language_clarity": evaluation.language_clarity,
+                    "empathy_score": evaluation.empathy_score,
+                    "overall_score": evaluation.overall_score,
+                    "feedback": evaluation.feedback
+                }
+                return initial_response
+        else:
+            # Score is good enough, return initial response with evaluation
+            initial_response.evaluation = {
+                "medical_accuracy": evaluation.medical_accuracy,
+                "precision": evaluation.precision,
+                "language_clarity": evaluation.language_clarity,
+                "empathy_score": evaluation.empathy_score,
+                "overall_score": evaluation.overall_score,
+                "feedback": evaluation.feedback
+            }
+            return initial_response
         
     except Exception as e:
         raise HTTPException(
@@ -221,7 +320,7 @@ async def evaluate_response(request: EvaluationRequest) -> EvaluationResponse:
     - Empathy Score (15% weight)
     
     - **response**: The telehealth response to evaluate
-    - **context**: Context of the conversation
+    - **messages**: Full chat history for context evaluation
     - **profile**: Patient profile information
     
     Returns detailed evaluation scores and feedback.
@@ -240,7 +339,163 @@ async def evaluate_response(request: EvaluationRequest) -> EvaluationResponse:
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "WebFAQMCP"}
+    return {"status": "healthy", "service": "AshAI"}
+
+
+@app.post("/turn")
+async def turn_integration(request: Request):
+    """
+    Turn.io integration endpoint for WhatsApp chat integration.
+    
+    Handles both handshake and context retrieval requests from Turn.io.
+    Converts WhatsApp chat messages to AshAI format and returns responses.
+    """
+    try:
+        # Get query parameters
+        query_params = dict(request.query_params)
+        
+        # Handle handshake request
+        if query_params.get("handshake") == "true":
+            return {
+                "version": "1.0.0-alpha",
+                "capabilities": {
+                    "actions": True,
+                    "suggested_responses": True,
+                    "context_objects": [
+                        {
+                            "title": "Patient Information",
+                            "code": "patient_info",
+                            "type": "table"
+                        },
+                        {
+                            "title": "Medical Context",
+                            "code": "medical_context", 
+                            "type": "ordered-list"
+                        }
+                    ]
+                }
+            }
+        
+        # Handle context retrieval request
+        body = await request.json()
+        chat = body.get("chat", {})
+        messages = body.get("messages", [])
+        
+        # Convert Turn.io messages to AshAI format
+        ashai_messages = []
+        for msg in messages:
+            # Only process user messages (inbound)
+            if msg.get("direction") == "inbound":
+                ashai_messages.append({
+                    "role": "user",
+                    "content": msg.get("text", "")
+                })
+        
+        # Create patient profile from chat context
+        patient_profile = f"""Name: {chat.get('owner', 'Unknown')}
+Location: WhatsApp User
+Language: English
+Category: General
+Patient History: Chat-based consultation"""
+        
+        # Create AshAI request
+        ashai_request = TelehealthRequest(
+            messages=[Message(**msg) for msg in ashai_messages],
+            profile=patient_profile
+        )
+        
+        # Get AshAI response
+        ashai_response = process_telehealth_request(ashai_request)
+        
+        # Convert to Turn.io format
+        context_objects = {
+            "patient_info": {
+                "Phone Number": chat.get("owner", "Unknown"),
+                "Chat State": chat.get("state", "Active"),
+                "Response Quality": f"{ashai_response.evaluation.get('overall_score', 0):.1f}/10" if ashai_response.evaluation else "N/A"
+            },
+            "medical_context": [
+                f"**Medical Sources**: {len(ashai_response.sources)} PubMed articles",
+                f"**Response Length**: {len(ashai_response.response)} characters",
+                f"**FAQs Used**: {len(ashai_response.faqs)} medical FAQs"
+            ]
+        }
+        
+        # Create suggested responses from AshAI
+        suggested_responses = []
+        if ashai_response.response:
+            # Get evaluation score for confidence calculation
+            evaluation_score = ashai_response.evaluation.get('overall_score', 75) if ashai_response.evaluation else 75
+            base_confidence = evaluation_score / 100.0  # Convert to 0-1 scale
+            
+            # Check if this is an error response
+            if "I apologize, but I encountered an issue" in ashai_response.response:
+                # Don't split error messages, just return as one response
+                suggested_responses.append({
+                    "type": "TEXT",
+                    "title": "Medical Response",
+                    "body": ashai_response.response,
+                    "confidence": base_confidence * 0.8  # Lower confidence for error responses
+                })
+            else:
+                # Split response into logical parts
+                # Look for natural break points like periods followed by spaces
+                response_parts = []
+                current_part = ""
+                
+                sentences = ashai_response.response.split('. ')
+                for sentence in sentences:
+                    if sentence.strip():
+                        # If adding this sentence would make the part too long, start a new part
+                        if len(current_part + sentence) > 200 and current_part:
+                            response_parts.append(current_part.strip())
+                            current_part = sentence
+                        else:
+                            if current_part:
+                                current_part += ". " + sentence
+                            else:
+                                current_part = sentence
+                
+                # Add the last part
+                if current_part.strip():
+                    response_parts.append(current_part.strip())
+                
+                # Create suggested responses from parts
+                for i, part in enumerate(response_parts[:3]):  # Max 3 suggestions
+                    if part.strip():
+                        title = f"Response Part {i+1}" if len(response_parts) > 1 else "Medical Response"
+                        
+                        # Calculate confidence based on evaluation score and position
+                        # First part gets full confidence, subsequent parts get slightly reduced
+                        part_confidence = base_confidence * (1.0 - (i * 0.05))  # 5% reduction per part
+                        
+                        suggested_responses.append({
+                            "type": "TEXT",
+                            "title": title,
+                            "body": part.strip() + ("." if not part.strip().endswith(".") else ""),
+                            "confidence": round(part_confidence, 2)
+                        })
+        
+        # Add disclaimer as a separate suggestion with moderate confidence
+        suggested_responses.append({
+            "type": "TEXT",
+            "title": "Medical Disclaimer",
+            "body": "This information is for educational purposes only. Please consult with your healthcare provider for personalized medical advice.",
+            "confidence": 0.7  # Standard confidence for disclaimers
+        })
+        
+        return {
+            "version": "1.0.0-alpha",
+            "context_objects": context_objects,
+            "actions": {},
+            "suggested_responses": suggested_responses
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing Turn.io request: {str(e)}"
+        )
 
 
 # For direct usage/testing

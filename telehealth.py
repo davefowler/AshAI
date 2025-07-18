@@ -59,7 +59,7 @@ class TelehealthAgent:
             return self._create_error_response("No relevant medical information found")
         
         # Generate response based on FAQs and profile
-        response = self._generate_response(latest_message.content, faqs, request.profile)
+        response = self._generate_response(latest_message.content, faqs, request.profile, request.messages)
         
         # Remove duplicate sources
         unique_sources = self._deduplicate_sources(all_sources)
@@ -94,7 +94,7 @@ class TelehealthAgent:
                 if any(word in content for word in ["eat", "food", "diet", "nutrition"]):
                     queries.append("pregnancy nutrition guidelines")
                 
-                if any(word in content for word in ["symptom", "pain", "discomfort", "problem"]):
+                if any(word in content for word in ["symptom", "pain", "discomfort", "problem", "headache", "head ache", "migraine"]):
                     queries.append("pregnancy symptoms and complications")
                 
                 if any(word in content for word in ["medicine", "medication", "drug", "pill"]):
@@ -102,6 +102,32 @@ class TelehealthAgent:
                 
                 if any(word in content for word in ["exercise", "workout", "activity", "fitness"]):
                     queries.append("pregnancy exercise guidelines")
+                
+                # General medical conditions (not just pregnancy)
+                if any(word in content for word in ["headache", "head ache", "migraine", "head pain"]):
+                    queries.append("headache causes and treatment")
+                
+                if any(word in content for word in ["fever", "temperature", "hot"]):
+                    queries.append("fever management and treatment")
+                
+                if any(word in content for word in ["cough", "cold", "flu", "sick"]):
+                    queries.append("respiratory symptoms and treatment")
+                
+                if any(word in content for word in ["stomach", "nausea", "vomit", "diarrhea"]):
+                    queries.append("gastrointestinal symptoms")
+                
+                if any(word in content for word in ["tired", "fatigue", "exhausted", "sleep"]):
+                    queries.append("fatigue and sleep issues")
+                
+                if any(word in content for word in ["anxiety", "stress", "depression", "mental"]):
+                    queries.append("mental health concerns")
+                
+                # Generic medical terms
+                if any(word in content for word in ["hurt", "pain", "ache", "sore", "uncomfortable"]):
+                    queries.append("general pain management")
+                
+                if any(word in content for word in ["symptom", "sign", "problem", "issue", "concern"]):
+                    queries.append("general medical symptoms")
         
         # Extract from profile
         profile_lower = profile.lower()
@@ -121,49 +147,102 @@ class TelehealthAgent:
         
         return unique_queries[:3]  # Limit to 3 most relevant queries
     
-    def _generate_response(self, user_message: str, faqs: List[WebFAQResult], profile: str) -> str:
+    def _generate_response(self, user_message: str, faqs: List[WebFAQResult], profile: str, messages: Optional[List[Message]] = None) -> str:
         """Generate a personalized response based on FAQs and profile"""
         
         # Extract key information from profile
         profile_info = self._parse_profile(profile)
         
+        # Check for system messages with evaluation feedback
+        evaluation_feedback = None
+        if messages:
+            for message in messages:
+                if message.role.lower() == "system" and "evaluation score" in message.content.lower():
+                    evaluation_feedback = message.content
+                    break
+        
         # Build response based on user message and available FAQs
         response_parts = []
         
+        # If we have evaluation feedback, acknowledge it
+        if evaluation_feedback:
+            response_parts.append("I understand the previous response needed improvement. Let me provide a better answer:")
+        
         # Greeting based on profile
         if profile_info.get("name"):
-            response_parts.append(f"Hello {profile_info['name']}! I'm here to help you with your pregnancy-related questions.")
+            response_parts.append(f"Hello {profile_info['name']}! I'm here to help you with your health questions.")
         else:
-            response_parts.append("Hello! I'm here to help you with your pregnancy-related questions.")
+            response_parts.append("Hello! I'm here to help you with your health questions.")
         
         # Address the specific question
         user_lower = user_message.lower()
         
-        if any(word in user_lower for word in ["eat", "food", "diet", "nutrition"]):
-            response_parts.append("Regarding your question about food and nutrition during pregnancy:")
+        # Pregnancy-specific queries
+        if any(word in user_lower for word in ["pregnant", "pregnancy", "baby", "fetus"]):
+            response_parts.append("Regarding your pregnancy-related question:")
             
-            # Find relevant FAQ about nutrition
-            nutrition_faq = next((faq for faq in faqs if "nutrition" in faq.question.lower() or "diet" in faq.question.lower()), None)
-            if nutrition_faq:
-                response_parts.append(f"Based on medical research: {nutrition_faq.answer}")
+            if any(word in user_lower for word in ["eat", "food", "diet", "nutrition"]):
+                response_parts.append("Regarding your question about food and nutrition during pregnancy:")
+                
+                # Find relevant FAQ about nutrition
+                nutrition_faq = next((faq for faq in faqs if "nutrition" in faq.question.lower() or "diet" in faq.question.lower()), None)
+                if nutrition_faq:
+                    response_parts.append(f"Based on medical research: {nutrition_faq.answer}")
+                else:
+                    response_parts.append("It's important to maintain a balanced diet during pregnancy. Consult with your healthcare provider for personalized nutrition advice.")
+            
+            elif any(word in user_lower for word in ["symptom", "pain", "discomfort", "problem"]):
+                response_parts.append("Regarding your pregnancy symptoms:")
+                
+                # Find relevant FAQ about symptoms
+                symptom_faq = next((faq for faq in faqs if "symptom" in faq.question.lower() or "complication" in faq.question.lower()), None)
+                if symptom_faq:
+                    response_parts.append(f"Based on medical research: {symptom_faq.answer}")
+                else:
+                    response_parts.append("Some symptoms are normal during pregnancy, but it's important to discuss any concerns with your healthcare provider.")
+            
             else:
-                response_parts.append("It's important to maintain a balanced diet during pregnancy. Consult with your healthcare provider for personalized nutrition advice.")
+                # General pregnancy information
+                if faqs:
+                    response_parts.append("Based on current medical research:")
+                    response_parts.append(faqs[0].answer)
         
-        elif any(word in user_lower for word in ["symptom", "pain", "discomfort", "problem"]):
-            response_parts.append("Regarding your symptoms:")
+        # General medical queries
+        elif any(word in user_lower for word in ["headache", "head ache", "migraine", "head pain"]):
+            response_parts.append("Regarding your headache:")
             
-            # Find relevant FAQ about symptoms
-            symptom_faq = next((faq for faq in faqs if "symptom" in faq.question.lower() or "complication" in faq.question.lower()), None)
-            if symptom_faq:
-                response_parts.append(f"Based on medical research: {symptom_faq.answer}")
+            # Find relevant FAQ about headaches
+            headache_faq = next((faq for faq in faqs if "headache" in faq.question.lower() or "pain" in faq.question.lower()), None)
+            if headache_faq:
+                response_parts.append(f"Based on medical research: {headache_faq.answer}")
             else:
-                response_parts.append("Some symptoms are normal during pregnancy, but it's important to discuss any concerns with your healthcare provider.")
+                response_parts.append("Headaches can have various causes. If your headache is severe, persistent, or accompanied by other symptoms, please consult with your healthcare provider.")
+        
+        elif any(word in user_lower for word in ["fever", "temperature", "hot"]):
+            response_parts.append("Regarding your fever:")
+            
+            fever_faq = next((faq for faq in faqs if "fever" in faq.question.lower() or "temperature" in faq.question.lower()), None)
+            if fever_faq:
+                response_parts.append(f"Based on medical research: {fever_faq.answer}")
+            else:
+                response_parts.append("Fever is often a sign of infection. Monitor your temperature and consult with your healthcare provider if it persists or is accompanied by other symptoms.")
+        
+        elif any(word in user_lower for word in ["cough", "cold", "flu", "sick"]):
+            response_parts.append("Regarding your respiratory symptoms:")
+            
+            respiratory_faq = next((faq for faq in faqs if "cough" in faq.question.lower() or "respiratory" in faq.question.lower()), None)
+            if respiratory_faq:
+                response_parts.append(f"Based on medical research: {respiratory_faq.answer}")
+            else:
+                response_parts.append("Respiratory symptoms can be caused by various conditions. Rest, hydration, and monitoring your symptoms are important. Consult with your healthcare provider if symptoms worsen.")
         
         else:
-            # General pregnancy information
+            # General medical information
             if faqs:
                 response_parts.append("Based on current medical research:")
                 response_parts.append(faqs[0].answer)
+            else:
+                response_parts.append("I understand you have health concerns. It's important to discuss your specific symptoms with your healthcare provider for personalized medical advice.")
         
         # Add personalized advice based on profile
         if profile_info.get("language") == "Hindi":

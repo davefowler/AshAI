@@ -8,7 +8,7 @@ based on medical accuracy, precision, language clarity, and empathy.
 
 import re
 from typing import Dict, List
-from models import EvaluationRequest, EvaluationResponse
+from models import EvaluationRequest, EvaluationResponse, Message
 
 
 class EvaluationAgent:
@@ -28,20 +28,23 @@ class EvaluationAgent:
         Evaluate a telehealth response based on multiple criteria
         
         Args:
-            request: EvaluationRequest containing response, context, and profile
+            request: EvaluationRequest containing response, messages, and profile
             
         Returns:
             EvaluationResponse with scores and feedback
         """
         response = request.response
-        context = request.context
+        messages = request.messages
         profile = request.profile
+        
+        # Build context from messages
+        context = self._build_context_from_messages(messages)
         
         # Evaluate each criterion
         medical_accuracy = self._evaluate_medical_accuracy(response, context)
-        precision = self._evaluate_precision(response, context)
+        precision = self._evaluate_precision(response, context, messages)
         language_clarity = self._evaluate_language_clarity(response, profile)
-        empathy_score = self._evaluate_empathy(response, profile)
+        empathy_score = self._evaluate_empathy(response, profile, messages)
         
         # Calculate overall weighted score
         overall_score = (
@@ -110,7 +113,17 @@ class EvaluationAgent:
         
         return min(100.0, max(0.0, score))
     
-    def _evaluate_precision(self, response: str, context: str) -> float:
+    def _build_context_from_messages(self, messages: List[Message]) -> str:
+        """Build context string from chat messages"""
+        context_parts = []
+        for message in messages:
+            if message.role.lower() == "user":
+                context_parts.append(f"User: {message.content}")
+            elif message.role.lower() == "assistant":
+                context_parts.append(f"Assistant: {message.content}")
+        return " | ".join(context_parts)
+    
+    def _evaluate_precision(self, response: str, context: str, messages: List[Message]) -> float:
         """Evaluate precision of the response (0-100)"""
         score = 60.0  # Base score
         
@@ -118,9 +131,26 @@ class EvaluationAgent:
         context_lower = context.lower()
         response_lower = response.lower()
         
-        # Look for specific medical terms in context
-        medical_terms = ["pregnancy", "nutrition", "symptom", "medication", "exercise"]
-        relevant_terms = [term for term in medical_terms if term in context_lower]
+        # Extract user questions from messages
+        user_questions = []
+        for message in messages:
+            if message.role.lower() == "user":
+                user_questions.append(message.content.lower())
+        
+        # Look for specific medical terms in context and user questions
+        medical_terms = ["pregnancy", "nutrition", "symptom", "medication", "exercise", "eat", "food", "banana"]
+        relevant_terms = []
+        
+        # Check context
+        for term in medical_terms:
+            if term in context_lower:
+                relevant_terms.append(term)
+        
+        # Check user questions
+        for question in user_questions:
+            for term in medical_terms:
+                if term in question and term not in relevant_terms:
+                    relevant_terms.append(term)
         
         # Check if response addresses relevant terms
         addressed_terms = 0
@@ -191,7 +221,7 @@ class EvaluationAgent:
         
         return min(100.0, max(0.0, score))
     
-    def _evaluate_empathy(self, response: str, profile: str) -> float:
+    def _evaluate_empathy(self, response: str, profile: str, messages: List[Message]) -> float:
         """Evaluate empathy score of the response (0-100)"""
         score = 60.0  # Base score
         
@@ -202,6 +232,13 @@ class EvaluationAgent:
         # Personalization
         if patient_name and patient_name.lower() in response.lower():
             score += 15
+        
+        # Check if response acknowledges the conversation history
+        user_message_count = len([m for m in messages if m.role.lower() == "user"])
+        if user_message_count > 1:
+            # Bonus for acknowledging multiple messages
+            if any(word in response.lower() for word in ["your questions", "your concerns", "as you mentioned"]):
+                score += 10
         
         # Empathetic language
         empathetic_phrases = [

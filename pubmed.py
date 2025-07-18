@@ -184,7 +184,8 @@ class PubMedAPI:
             sources = [Source(
                 title=article.get("title", ""),
                 pmid=pmid,
-                url=url
+                url=url,
+                content=snippet
             )]
             
             result = WebFAQResult(

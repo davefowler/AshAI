@@ -7,6 +7,7 @@ class Source(BaseModel):
     title: str = Field(..., description="Title of the medical research article")
     pmid: str = Field(..., description="PubMed ID for the article")
     url: str = Field(..., description="PubMed URL for the full article")
+    content: str = Field(..., description="Content snippet extracted from the source")
 
 
 class WebFAQResult(BaseModel):
@@ -32,6 +33,13 @@ class FAQResponse(BaseModel):
     total_results: int = Field(..., description="Total number of results found")
 
 
+class SourcesResponse(BaseModel):
+    """Response containing raw source data"""
+    sources: List[Source] = Field(..., description="List of raw source data with content snippets")
+    query: str = Field(..., description="Original query that was searched")
+    total_results: int = Field(..., description="Total number of sources found")
+
+
 class Message(BaseModel):
     """Chat message for telehealth agent"""
     role: str = Field(..., description="Role of the message sender (user/assistant)")
@@ -55,7 +63,7 @@ class TelehealthResponse(BaseModel):
 class EvaluationRequest(BaseModel):
     """Request for evaluation agent"""
     response: str = Field(..., description="The response to evaluate")
-    context: str = Field(..., description="Context of the conversation")
+    messages: List[Message] = Field(..., description="Full chat history for context")
     profile: str = Field(..., description="Patient profile information")
 
 
